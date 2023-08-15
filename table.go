@@ -33,6 +33,7 @@ type (
 		Name     string
 		Tag      *Tag
 		Field    *xunsafe.Field
+		xType    *xunsafe.Type
 		Table    *Table
 		size     int
 	}
@@ -186,8 +187,14 @@ func NewTable(sliceType reflect.Type, tableTag *Tag, stylizer *Stylizer, parent 
 		if pos := fieldTag.Position; pos != nil {
 			columnPos = *pos
 		}
+
+		var xType *xunsafe.Type
+		if field.Kind() == reflect.Ptr {
+			xType = xunsafe.NewType(field.Type.Elem())
+		}
 		column := &Column{
 			Field:    field,
+			xType:    xType,
 			Tag:      fieldTag,
 			Position: columnPos,
 		}

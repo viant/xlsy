@@ -142,6 +142,13 @@ func (m *Marshaller) marshalTableData(v any, aTable *Table, dest *excelize.File,
 				continue
 			}
 			value := xField.Value(recordPtr)
+
+			if xField.Kind() == reflect.Ptr {
+				if (*unsafe.Pointer)(xunsafe.AsPointer(value)) != nil {
+					value = column.xType.Deref(value)
+				}
+			}
+
 			if err = dest.SetCellValue(sheetName, address, value); err != nil {
 				return err
 			}

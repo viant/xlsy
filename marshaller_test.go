@@ -38,16 +38,16 @@ func TestMarshaller_Marshal(t *testing.T) {
 				}
 
 				type Doc struct {
-					ID       int         `xls:"styleref=header"`
+					ID       *int        `xls:"styleref=header"`
 					Customer string      `xls:"styleref=header"`
-					Date     *time.Time  `xls:"styleref=header"`
+					Date     *time.Time  `xls:"styleref=header,style={width:150px}"`
 					Items    []*LineItem `xls:"embed=true,styleref=header"`
 					Comments string      `xls:"styleref=header"`
 				}
 
 				return []*Doc{
 					{
-						ID:       101,
+						ID:       intPtr(101),
 						Customer: "customer 1",
 						Items: []*LineItem{
 							{
@@ -66,8 +66,9 @@ func TestMarshaller_Marshal(t *testing.T) {
 						Comments: "comments 1",
 					},
 					{
-						ID:       101,
+						ID:       intPtr(101),
 						Customer: "customer 2",
+						Date:     &now,
 						Items: []*LineItem{
 							{
 								Pos:      10,
@@ -220,4 +221,8 @@ func TestMarshaller_Marshal(t *testing.T) {
 		err = fs.Upload(context.Background(), path.Join(os.Getenv("HOME"), fmt.Sprintf("test_%02d.xlsx", i)), file.DefaultFileOsMode, bytes.NewReader(data))
 		assert.Nil(t, err, testCase.description)
 	}
+}
+
+func intPtr(i int) *int {
+	return &i
 }
