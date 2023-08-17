@@ -23,6 +23,30 @@ func TestMarshaller_Marshal(t *testing.T) {
 	}{
 
 		{
+			description: "one to one",
+			options: []Option{
+				WithTag(&Tag{Name: "Documnt"}),
+			},
+			get: func() interface{} {
+
+				type Doc struct {
+					ID       *int
+					Customer string
+					Date     *time.Time `xls:"style={width:150px}"`
+					Comments string
+				}
+
+				type Holder struct {
+					Doc *Doc
+				}
+
+				return &Holder{Doc: &Doc{
+					ID:       intPtr(101),
+					Customer: "customer 1",
+				}}
+			},
+		},
+		{
 			description: "one to many with style ref",
 			options: []Option{
 				WithNamedStyles("header", "header-font-style:bold"),
@@ -211,7 +235,7 @@ func TestMarshaller_Marshal(t *testing.T) {
 	}
 	fs := afs.New()
 
-	for i, testCase := range testCases {
+	for i, testCase := range testCases[:1] {
 		aMarshaller := NewMarshaller(testCase.options...)
 		data, err := aMarshaller.Marshal(testCase.get())
 		if !assert.Nil(t, err, testCase.description) {

@@ -63,6 +63,10 @@ func (m *Marshaller) marshalHolder(v any, structType reflect.Type, stylizer *Sty
 	var sheet *int
 	for i := range xStruct.Fields {
 		field := &xStruct.Fields[i]
+		fieldType := field.Type
+		if fieldType.Kind() == reflect.Ptr {
+			fieldType = fieldType.Elem()
+		}
 		tag, err := parseTag(field.Tag.Get(TagName))
 		if err != nil {
 			return 0, err
@@ -70,13 +74,20 @@ func (m *Marshaller) marshalHolder(v any, structType reflect.Type, stylizer *Sty
 		if tag.Name == "" {
 			tag.Name = field.Name
 		}
-		if field.Kind() != reflect.Slice {
+		sliceType := fieldType
+		value := field.Value(ptr)
+		switch fieldType.Kind() {
+		case reflect.Struct:
+			sliceType = reflect.SliceOf(field.Type)
+			value = m.toSingleElementSlice(sliceType, value)
+		case reflect.Slice:
+		default:
 			continue
 		}
-		value := field.Value(ptr)
+
 		opts := &options{stylizer: stylizer, tag: tag}
 		offset := &offset{row: tag.OffsetY, column: tag.OffsetX}
-		ret, err := m.marshalSlice(value, field.Type, opts, stylizer, dest, offset)
+		ret, err := m.marshalSlice(value, sliceType, opts, stylizer, dest, offset)
 		if sheet == nil {
 			sheet = &ret
 		}
@@ -88,6 +99,15 @@ func (m *Marshaller) marshalHolder(v any, structType reflect.Type, stylizer *Sty
 		return *sheet, nil
 	}
 	return 0, nil
+}
+
+func (m *Marshaller) toSingleElementSlice(sliceType reflect.Type, value interface{}) interface{} {
+	slice := reflect.MakeSlice(sliceType, 1, 1)
+	slice.Index(0).Set(reflect.ValueOf(value))
+	slicePtrValue := reflect.New(sliceType)
+	slicePtrValue.Elem().Set(slice)
+	value = slicePtrValue.Interface()
+	return value
 }
 
 func (m *Marshaller) marshalSlice(v any, sliceType reflect.Type, options *options, stylizer *Stylizer, dest *excelize.File, offset *offset) (int, error) {
