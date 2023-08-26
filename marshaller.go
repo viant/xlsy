@@ -15,9 +15,9 @@ type Marshaller struct {
 }
 
 // Marshal marshall arbitrary type to xls
-func (m *Marshaller) Marshal(v any) ([]byte, error) {
+func (m *Marshaller) Marshal(any interface{}, moptions ...interface{}) ([]byte, error) {
 	dest := excelize.NewFile()
-	rawType := reflect.TypeOf(v)
+	rawType := reflect.TypeOf(any)
 	stylizer := &Stylizer{registry: map[string]*Style{}, file: dest}
 	opts := &options{stylizer: stylizer}
 	err := opts.apply(m.options)
@@ -31,11 +31,11 @@ func (m *Marshaller) Marshal(v any) ([]byte, error) {
 	var sheet int
 	switch rawType.Kind() {
 	case reflect.Slice:
-		sheet, err = m.marshalSlice(v, rawType, opts, stylizer, dest, offset)
+		sheet, err = m.marshalSlice(any, rawType, opts, stylizer, dest, offset)
 	case reflect.Struct:
-		sheet, err = m.marshalHolder(v, rawType, stylizer, dest)
+		sheet, err = m.marshalHolder(any, rawType, stylizer, dest)
 	default:
-		return nil, fmt.Errorf("unsupported type: %T", v)
+		return nil, fmt.Errorf("unsupported type: %T", any)
 	}
 	if err != nil {
 		return nil, err
