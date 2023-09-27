@@ -141,6 +141,9 @@ func (s *workSheet) transferHeader(table *Table, cur Cursor) (dim Cursor, err er
 	}
 	for i, header := range table.Header.Values {
 		span := 1
+		if len(table.Rows) == 0 || i >= len(table.Rows[0].Values) {
+			continue
+		}
 		column := table.columnByIndex(i)
 		if column.Tag.Omitempty && !table.Rows[0].Values[i].HasValue() {
 			continue
