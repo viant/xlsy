@@ -121,6 +121,8 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 		t.Name = value
 	case "worksheet":
 		t.WorkSheet = value
+	case "omitempty":
+		t.Omitempty = true
 	case "embed":
 		embed := value == "true"
 		t.Embed = embed
