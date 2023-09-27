@@ -39,7 +39,8 @@ func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, item := range aSession.sheets {
+	for _, name := range aSession.names {
+		item := aSession.sheets[name]
 		if err := item.transfer(); err != nil {
 			return nil, err
 		}
@@ -58,7 +59,10 @@ func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 }
 
 func (m *Marshaller) deleteDefaultWorksheetIfNeeded(aSheet *workSheet) {
-	workSheet := aSheet.dest.WorkBook.Sheets.Sheet[aSheet.index]
+	if aSheet.index == nil {
+		return
+	}
+	workSheet := aSheet.dest.WorkBook.Sheets.Sheet[*aSheet.index]
 	if workSheet.Name != defaultSheetName {
 		_ = aSheet.dest.DeleteSheet(defaultSheetName)
 	}
@@ -111,8 +115,11 @@ func (m *Marshaller) buildSheet(v any, tableType reflect.Type, aSession *session
 	if err != nil {
 		return nil, err
 	}
+	if aTable.Omitempty && v == nil {
+		return nil, err
+	}
 	sheetName := aTable.SheetName()
-	aSheet, err := aSession.getOrCreateSheet(sheetName)
+	aSheet, err := aSession.getOrCreateSheet(sheetName, aTable.First)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +243,7 @@ func (m *Marshaller) setTableHeader(aTable *Table, aSession *session) error {
 				header.header = column.Table.Header
 			} else {
 				sheetName := column.Table.SheetName()
-				aSheet, err := aSession.getOrCreateSheet(sheetName)
+				aSheet, err := aSession.getOrCreateSheet(sheetName, column.Table.First)
 				if err != nil {
 					return err
 				}

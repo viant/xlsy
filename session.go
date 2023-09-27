@@ -12,6 +12,7 @@ type session struct {
 	tag      *Tag
 	stylizer *Stylizer
 	sheets   map[string]*workSheet
+	names    []string
 	mux      sync.Mutex
 }
 
@@ -26,24 +27,51 @@ func (m *session) apply(options []Option) error {
 	}
 	return nil
 }
+func (m *workSheet) ensureWorksheet() error {
+	if m.index != nil {
+		return nil
+	}
+	index, err := m.dest.NewSheet(m.name)
+	if err != nil {
+		return err
+	}
+	m.index = &index
+	return nil
+}
 
-func (m *session) getOrCreateSheet(name string) (*workSheet, error) {
+func (m *session) getOrCreateSheet(name string, first bool) (*workSheet, error) {
 	if m.parent != nil {
-		return m.parent.getOrCreateSheet(name)
+		return m.parent.getOrCreateSheet(name, first)
 	}
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	ret, ok := m.sheets[name]
 	if ok {
+		m.ensureFirst(name, first)
 		return ret, nil
 	}
-	index, err := m.stylizer.file.NewSheet(name)
-	if err != nil {
-		return nil, err
-	}
-	ret = &workSheet{name: name, index: index, dest: m.stylizer.file}
+
+	ret = &workSheet{name: name, dest: m.stylizer.file}
 	m.sheets[name] = ret
+	if first {
+		m.names = append([]string{name}, m.names...)
+	} else {
+		m.names = append(m.names, name)
+	}
 	return ret, nil
+}
+
+func (m *session) ensureFirst(name string, first bool) {
+	if first && m.names[0] != name {
+		var names = []string{name}
+		for _, item := range m.names {
+			if item == name {
+				continue
+			}
+			names = append(names, item)
+		}
+		m.names = names
+	}
 }
 
 func newSession(parent *session, stylizer *Stylizer, tag *Tag) *session {

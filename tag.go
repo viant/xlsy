@@ -28,6 +28,7 @@ type (
 		Omitempty    bool
 		Position     *int
 		Inverted     *bool //inverted orientation
+		First        bool
 		Row          int
 		Column       int
 		ColumnOffset int
@@ -129,6 +130,8 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 	case "invert", "inverted":
 		invert := value == "true"
 		t.Inverted = &invert
+	case "first":
+		t.First = true
 	case "row":
 		if err := convertAndSetInt(&t.Row, "row", value); err != nil {
 			return err

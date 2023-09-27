@@ -5,7 +5,7 @@ import (
 )
 
 type workSheet struct {
-	index int
+	index *int
 	name  string
 
 	tables []*Table
@@ -20,22 +20,37 @@ func (s *workSheet) addTable(table *Table) {
 }
 
 func (s *workSheet) SetActiveSheet() {
-	s.dest.SetActiveSheet(s.index)
+	if s.index == nil {
+		return
+	}
+	s.dest.SetActiveSheet(*s.index)
 }
 
 func (s *workSheet) SetCellValue(cell string, value interface{}) error {
+	if err := s.ensureWorksheet(); err != nil {
+		return err
+	}
 	return s.dest.SetCellValue(s.name, cell, value)
 }
 
 func (s *workSheet) SetCellStyle(hCell, vCell string, styleID int) error {
+	if err := s.ensureWorksheet(); err != nil {
+		return err
+	}
 	return s.dest.SetCellStyle(s.name, hCell, vCell, styleID)
 }
 
 func (s *workSheet) MergeCells(hCell, vCell string) error {
+	if err := s.ensureWorksheet(); err != nil {
+		return err
+	}
 	return s.dest.MergeCell(s.name, hCell, vCell)
 }
 
 func (s *workSheet) SetColWidth(startCol, endCol string, width float64) error {
+	if err := s.ensureWorksheet(); err != nil {
+		return err
+	}
 	return s.dest.SetColWidth(s.name, startCol, endCol, width)
 }
 
