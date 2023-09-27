@@ -89,6 +89,9 @@ func (s *workSheet) transferData(table *Table, cursor Cursor) (dim Cursor, err e
 		height := 1
 
 		for j, _ := range row.Values {
+			if j >= len(table.Header.Values) {
+				continue
+			}
 			header := table.Header.Values[j]
 			cell := row.Values[j]
 			column := table.columnByIndex(j)
