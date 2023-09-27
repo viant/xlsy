@@ -21,7 +21,8 @@ This project uses [excelize](github.com/xuri/excelize) project to convert comple
 
 You can use the following struct Tag to customize output
 - Name: header or sheet name
-- Style: CSS like style that are translated to excelize.Style: i.e: style:{color:red;font-style:bold}
+- Style: CSS like style that are translated to excelize.Style: i.e: cell.style:{color:red;font-style:bold}
+- Style use the following destination prefix: cell|header|column: i.e. header.style:{color:red;font-style:bold}
 - Style: StyleRef: style reference
 - Ignore: ignore struct field
 - Blank: blank row or column
