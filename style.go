@@ -26,10 +26,12 @@ type (
 
 	//Style represents a style
 	Style struct {
-		ID         string
-		Definition string
-		Header     *extStyle
-		Cell       *extStyle
+		Destination string //default cell,
+		ID          string
+		Definition  string
+		Header      *extStyle
+		Cell        *extStyle
+		Column      *extStyle
 	}
 )
 
@@ -82,61 +84,54 @@ func (e *extStyle) ensureProtection() {
 func (s *Style) Init() error {
 	s.Cell = &extStyle{}
 	s.Header = &extStyle{}
+	s.Column = &extStyle{}
 	return ParseStyle(s.Definition, s)
 }
 
 func (s *Style) update(key, value string) (err error) {
+	dest := s.destination()
 	switch strings.ToLower(key) {
 	case "background-color":
-		return s.updateBackgroundColor(value, s.Cell)
-	case "header-background-color":
-		return s.updateBackgroundColor(value, s.Header)
+		return s.updateBackgroundColor(value, dest)
 	case "background-gradient":
-		return s.updateBackgroundGradient(value, s.Cell)
-	case "header-background-gradient":
-		return s.updateBackgroundGradient(value, s.Header)
+		return s.updateBackgroundGradient(value, dest)
 	case "font-style":
-		s.updateFontStyle(value, s.Cell)
-	case "header-font-style":
-		s.updateFontStyle(value, s.Header)
+		s.updateFontStyle(value, dest)
 	case "font-family":
-		s.updateFontFamily(value, s.Cell)
-	case "header-font-family":
-		s.updateFontFamily(value, s.Header)
-
+		s.updateFontFamily(value, dest)
 	case "color":
-		return s.updateColor(value, s.Cell)
-	case "header-color":
-		return s.updateColor(value, s.Header)
+		return s.updateColor(value, dest)
 	case "vertical-align":
-		return s.updateVerticalAlign(value, s.Cell)
-	case "header-vertical-align":
-		return s.updateVerticalAlign(value, s.Header)
+		return s.updateVerticalAlign(value, dest)
 	case "text-align":
-		return s.updateTextAlign(value, s.Cell)
-	case "header-text-align":
-		return s.updateTextAlign(value, s.Header)
+		return s.updateTextAlign(value, dest)
 	case "text-wrap":
-		s.updateTextWrap(s.Cell)
-	case "header-text-wrap":
-		s.updateTextWrap(s.Header)
+		s.updateTextWrap(dest)
 	case "text-indent":
-		return s.updateTextIndent(value, s.Cell)
-	case "header-text-indent":
-		return s.updateTextIndent(value, s.Header)
+		return s.updateTextIndent(value, dest)
 	case "width":
 		return s.updateWidth(value)
 	case "width-max":
 		return s.updateMaxWidth(value)
 	case "height":
-		return s.updateHeight(value, s.Cell)
-	case "header-height":
-		return s.updateHeight(value, s.Header)
+		return s.updateHeight(value, dest)
 	case "format":
-		s.updateFormat(value, s.Cell)
-
+		s.updateFormat(value, dest)
 	}
 	return nil
+}
+
+func (s *Style) destination() *extStyle {
+	var dest *extStyle
+	switch strings.ToLower(s.Destination) {
+	case "header":
+		dest = s.Header
+	case "column":
+		dest = s.Column
+	default:
+		dest = s.Cell
+	}
+	return dest
 }
 
 func ensureColor(value string) (string, error) {
@@ -178,7 +173,7 @@ func (s *Style) updateWidth(value string) (err error) {
 	if s.Cell.Width, err = parseLength(value); err != nil {
 		return fmt.Errorf("invalid width: %w, %s", err, value)
 	}
-	s.Header.Width = s.Cell.Width
+	s.Column.Width = s.Cell.Width
 	return err
 }
 
@@ -186,7 +181,7 @@ func (s *Style) updateMaxWidth(value string) (err error) {
 	if s.Cell.WidthMax, err = parseLength(value); err != nil {
 		return fmt.Errorf("invalid width-max: %w, %s", err, value)
 	}
-	s.Header.WidthMax = s.Cell.WidthMax
+	s.Column.WidthMax = s.Cell.WidthMax
 	return err
 }
 

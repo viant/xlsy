@@ -11,37 +11,44 @@ import (
 
 // Marshaller represents xls marshalle
 type Marshaller struct {
-	options []Option
+	session []Option
 }
 
 // Marshal marshall arbitrary type to xls
-func (m *Marshaller) Marshal(any interface{}, moptions ...interface{}) ([]byte, error) {
+func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 	dest := excelize.NewFile()
 	rawType := reflect.TypeOf(any)
 	stylizer := &Stylizer{registry: map[string]*Style{}, file: dest}
-	opts := &options{stylizer: stylizer}
-	err := opts.apply(m.options)
+	aSession := newSession(nil, stylizer, &Tag{})
+	err := aSession.apply(m.session)
 	if err != nil {
 		return nil, err
 	}
 	if rawType.Kind() == reflect.Ptr {
 		rawType = rawType.Elem()
 	}
-	offset := &offset{row: opts.tag.OffsetY, column: opts.tag.OffsetX}
-	var sheet int
+	var sheet *workSheet
 	switch rawType.Kind() {
 	case reflect.Slice:
-		sheet, err = m.marshalSlice(any, rawType, opts, stylizer, dest, offset)
+		sheet, err = m.buildSheet(any, rawType, aSession)
 	case reflect.Struct:
-		sheet, err = m.marshalHolder(any, rawType, stylizer, dest)
+		sheet, err = m.buildSheets(any, rawType, aSession)
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", any)
 	}
 	if err != nil {
 		return nil, err
 	}
-	m.deleteDefaultWorksheetIfNeeded(dest, sheet)
-	dest.SetActiveSheet(sheet)
+	for _, item := range aSession.sheets {
+		if err := item.transfer(); err != nil {
+			return nil, err
+		}
+	}
+	if sheet != nil {
+		m.deleteDefaultWorksheetIfNeeded(sheet)
+		sheet.SetActiveSheet()
+	}
+
 	err = dest.Close()
 	buffer := new(bytes.Buffer)
 	if err = dest.Write(buffer); err != nil {
@@ -50,17 +57,17 @@ func (m *Marshaller) Marshal(any interface{}, moptions ...interface{}) ([]byte, 
 	return buffer.Bytes(), err
 }
 
-func (m *Marshaller) deleteDefaultWorksheetIfNeeded(dest *excelize.File, sheet int) {
-	workSheet := dest.WorkBook.Sheets.Sheet[sheet]
+func (m *Marshaller) deleteDefaultWorksheetIfNeeded(aSheet *workSheet) {
+	workSheet := aSheet.dest.WorkBook.Sheets.Sheet[aSheet.index]
 	if workSheet.Name != defaultSheetName {
-		_ = dest.DeleteSheet(defaultSheetName)
+		_ = aSheet.dest.DeleteSheet(defaultSheetName)
 	}
 }
 
-func (m *Marshaller) marshalHolder(v any, structType reflect.Type, stylizer *Stylizer, dest *excelize.File) (int, error) {
+func (m *Marshaller) buildSheets(v any, structType reflect.Type, parent *session) (*workSheet, error) {
 	xStruct := xunsafe.NewStruct(structType)
 	ptr := xunsafe.AsPointer(v)
-	var sheet *int
+	var aSheet *workSheet
 	for i := range xStruct.Fields {
 		field := &xStruct.Fields[i]
 		fieldType := field.Type
@@ -69,205 +76,194 @@ func (m *Marshaller) marshalHolder(v any, structType reflect.Type, stylizer *Sty
 		}
 		tag, err := parseTag(field.Tag.Get(TagName))
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
-		if tag.Name == "" {
-			tag.Name = field.Name
+		if tag.WorkSheet == "" {
+			tag.WorkSheet = field.Name
 		}
-		sliceType := fieldType
 		value := field.Value(ptr)
 		switch fieldType.Kind() {
 		case reflect.Struct:
-			sliceType = reflect.SliceOf(field.Type)
-			value = m.toSingleElementSlice(sliceType, value)
 		case reflect.Slice:
 		default:
 			continue
 		}
-
-		opts := &options{stylizer: stylizer, tag: tag}
-		offset := &offset{row: tag.OffsetY, column: tag.OffsetX}
-		ret, err := m.marshalSlice(value, sliceType, opts, stylizer, dest, offset)
-		if sheet == nil {
-			sheet = &ret
+		aSession := newSession(parent, parent.stylizer, tag)
+		ret, err := m.buildSheet(value, field.Type, aSession)
+		if err != nil {
+			return nil, err
+		}
+		if aSheet == nil {
+			aSheet = ret
 		}
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
-	if sheet != nil {
-		return *sheet, nil
+	if aSheet != nil {
+		return aSheet, nil
 	}
-	return 0, nil
+	return aSheet, nil
 }
 
-func (m *Marshaller) toSingleElementSlice(sliceType reflect.Type, value interface{}) interface{} {
-	slice := reflect.MakeSlice(sliceType, 1, 1)
-	slice.Index(0).Set(reflect.ValueOf(value))
-	slicePtrValue := reflect.New(sliceType)
-	slicePtrValue.Elem().Set(slice)
-	value = slicePtrValue.Interface()
-	return value
-}
-
-func (m *Marshaller) marshalSlice(v any, sliceType reflect.Type, options *options, stylizer *Stylizer, dest *excelize.File, offset *offset) (int, error) {
-	aTable, err := NewTable(sliceType, options.tag, stylizer, nil)
+func (m *Marshaller) buildSheet(v any, tableType reflect.Type, aSession *session) (*workSheet, error) {
+	aTable, err := NewTable(tableType, aSession.tag, aSession, nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	sheetName := aTable.SheetName()
-	// Create a new sheet.
-	sheet, err := dest.NewSheet(sheetName)
+	aSheet, err := aSession.getOrCreateSheet(sheetName)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	//	value := xSlice.ValueAt(ptr, i)
-	if err = m.marshalTableHeader(aTable, dest, offset); err != nil {
-		return 0, err
+	aSheet.addTable(aTable)
+	if err = m.setTableHeader(aTable, aSession); err != nil {
+		return nil, err
+	}
+	if err = m.setTableData(v, aTable); err != nil {
+		return nil, err
 	}
 
-	offset.row++
-	if err = m.marshalTableData(v, aTable, dest, offset); err != nil {
-		return 0, err
-	}
-	return sheet, nil
+	return aSheet, nil
 }
 
-func (m *Marshaller) marshalTableData(v any, aTable *Table, dest *excelize.File, offset *offset) error {
+func (m *Marshaller) setTableData(v any, aTable *Table) error {
+	if aTable.IsStruct {
+		if v == nil {
+			return nil
+		}
+		ptr := xunsafe.AsPointer(v)
+		if ptr == nil {
+			return nil
+		}
+		return m.setRecord(aTable, 0, ptr)
+	}
+
 	sliceType := ensureSlice(aTable.Type)
+
 	xSlice := xunsafe.NewSlice(sliceType)
 	ptr := xunsafe.AsPointer(v)
 	sliceLen := xSlice.Len(ptr)
-	sheetName := aTable.SheetName()
-	//Render relations
-
-	rowSpans, err := m.marshalRelations(sliceLen, xSlice, ptr, aTable, offset, dest)
-	if err != nil {
-		return err
-	}
-	rowOffset := offset.row
+	aTable.Cardinality = sliceLen
 	for sliceIndex := 0; sliceIndex < sliceLen; sliceIndex++ {
 		record := xSlice.ValueAt(ptr, sliceIndex)
-		recordPtr := xunsafe.AsPointer(record)
-		columnOffset := offset.column
-		for i := 0; i < len(aTable.Columns); i++ {
-			column := aTable.Columns[i]
-			if column.Tag.Ignore {
-				continue
-			}
-			xField := column.Field
-			address := aTable.Address(rowOffset, columnOffset)
-			columnOffset += column.Size()
-			if column.Table != nil || column.Tag.Blank {
-				continue
-			}
-			value := xField.Value(recordPtr)
-
-			if xField.Kind() == reflect.Ptr {
-				if (*unsafe.Pointer)(xunsafe.AsPointer(value)) != nil {
-					value = column.xType.Deref(value)
-				}
-			}
-
-			if err = dest.SetCellValue(sheetName, address, value); err != nil {
-				return err
-			}
-			if styleID := column.CellStyleID(aTable.Stylizer); styleID != nil {
-				if err = dest.SetCellStyle(sheetName, address, address, *styleID); err != nil {
-					return err
-				}
-			}
+		if record == nil {
+			continue
 		}
-		rowOffset += rowSpans[sliceIndex]
-
+		recordPtr := xunsafe.AsPointer(record)
+		if recordPtr == nil {
+			continue
+		}
+		err := m.setRecord(aTable, sliceIndex, recordPtr)
+		if err != nil {
+			return err
+		}
 	}
-	offset.cols = len(aTable.Columns)
-	offset.rows = sliceLen
 	return nil
 }
 
-func (m *Marshaller) marshalRelations(sliceLen int, xSlice *xunsafe.Slice, ptr unsafe.Pointer, aTable *Table, offset *offset, dest *excelize.File) ([]int, error) {
-	var rowSpans []int
-	rowOffset := offset.row
-	for sliceIndex := 0; sliceIndex < sliceLen; sliceIndex++ {
-		record := xSlice.ValueAt(ptr, sliceIndex)
-		recordPtr := xunsafe.AsPointer(record)
-		rowSpan := 1
-
-		columnOffset := offset.column
-		for _, column := range aTable.Columns {
-			if column.Tag.Ignore {
-				continue
-			}
-			if column.Table == nil || column.Tag.Blank {
-				columnOffset += column.Size()
-				continue
-			}
-			value := column.Field.Value(recordPtr)
-			childOffset := newOffset(rowOffset, columnOffset)
-			if !column.Table.IsVertical() && aTable.IsVertical() {
-				childOffset = newOffset(columnOffset, rowOffset)
-			}
-			columnOffset += column.Size()
-			if err := m.marshalTableData(value, column.Table, dest, childOffset); err != nil {
-				return nil, err
-			}
-			if rowSpan < childOffset.rows {
-				rowSpan = childOffset.rows
-			}
-		}
-		rowOffset += rowSpan
-		rowSpans = append(rowSpans, rowSpan)
-	}
-	return rowSpans, nil
-}
-
-func (m *Marshaller) marshalTableHeader(aTable *Table, dest *excelize.File, offset *offset) error {
-	sheetName := aTable.SheetName()
-	columnOffset := offset.column
-	rowOffset := offset.row
+func (m *Marshaller) setRecord(aTable *Table, sliceIndex int, recordPtr unsafe.Pointer) error {
+	columnOffset := 0
 	for i := 0; i < len(aTable.Columns); i++ {
 		column := aTable.Columns[i]
 		if column.Tag.Ignore {
 			continue
 		}
-		if column.Table != nil {
-			fieldOffset := newOffset(rowOffset, columnOffset)
-			if !column.Table.IsVertical() && aTable.IsVertical() {
-				fieldOffset = newOffset(columnOffset, rowOffset)
-			}
-			if err := m.marshalTableHeader(column.Table, dest, fieldOffset); err != nil {
-				return err
-			}
-			columnOffset += column.Size()
-			continue
-		}
-		address := aTable.Address(rowOffset, columnOffset)
-		columnAddress := aTable.ColumnAddress(columnOffset)
-		columnOffset += column.Size()
 		if column.Tag.Blank {
+			columnOffset++
 			continue
 		}
-		if err := dest.SetCellValue(sheetName, address, column.Name); err != nil {
-			return err
-		}
-		if styleID := column.HeaderStyleID(aTable.Stylizer); styleID != nil {
-			if err := dest.SetCellStyle(sheetName, address, address, *styleID); err != nil {
+		row := aTable.Rows.index(sliceIndex)
+		xField := column.Field
+		value := xField.Value(recordPtr)
+		if column.Table != nil {
+			if err := m.setTableData(value, column.Table); err != nil {
 				return err
 			}
-		}
-		if width := column.Width(aTable.Stylizer); width != nil {
-			if err := dest.SetColWidth(sheetName, columnAddress, columnAddress, width.Value()); err != nil {
-				return err
+			if !column.Table.IsStandalone() {
+				cell := row.Values.index(columnOffset)
+				cell.rows = column.Table.Rows
+				columnOffset++
 			}
+			continue
+		}
+		cell := row.Values.index(columnOffset)
+		cell.omitEmpty = column.Tag.Omitempty
+		columnOffset++
+		if column.Table != nil {
+			cell.rows = column.Table.Rows
+			column.Table.Rows = nil
+			continue
+		}
+		isNil := false
+		if xField.Kind() == reflect.Ptr {
+			if (*unsafe.Pointer)(xunsafe.AsPointer(value)) != nil {
+				value = column.xType.Deref(value)
+			} else {
+				isNil = true
+			}
+		}
+		if !isNil {
+			cell.setValue(value)
+		}
+		if styleID := column.CellStyleID(aTable.Stylizer); styleID != nil {
+			cell.styleID = styleID
 		}
 	}
 	return nil
 }
 
+func (m *Marshaller) setTableHeader(aTable *Table, aSession *session) error {
+	columnOffset := 0
+	for i := 0; i < len(aTable.Columns); i++ {
+		column := aTable.Columns[i]
+		column.Position = i
+		if column.Tag.Ignore {
+			continue
+		}
+		header := aTable.newHeader(columnOffset, i)
+		columnOffset++
+		if column.Tag.Blank {
+			continue
+		}
+		if column.Table != nil {
+			m.setHeader(column.Table, header, column)
+
+			if err := m.setTableHeader(column.Table, aSession); err != nil {
+				return err
+			}
+			if !column.Table.IsStandalone() {
+				header.header = column.Table.Header
+			} else {
+				sheetName := column.Table.SheetName()
+				aSheet, err := aSession.getOrCreateSheet(sheetName)
+				if err != nil {
+					return err
+				}
+				aSheet.addTable(column.Table)
+			}
+			continue
+		}
+
+		m.setHeader(aTable, header, column)
+	}
+	return nil
+}
+
+func (m *Marshaller) setHeader(aTable *Table, header *value, column *Column) {
+	header.value = column.Name
+	if styleID := column.HeaderStyleID(aTable.Stylizer); styleID != nil {
+		header.styleID = styleID
+	}
+	if width := column.Width(aTable.Stylizer); width != nil {
+		header.width = width.Value()
+	}
+}
+
 // NewMarshaller create a marshaler with option
 func NewMarshaller(opts ...Option) *Marshaller {
-	ret := &Marshaller{options: opts}
+	opts = append(opts, WithDefaultHeaderStyle("font-style:bold"))
+	ret := &Marshaller{session: opts}
 	return ret
 
 }

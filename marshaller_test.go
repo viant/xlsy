@@ -23,9 +23,65 @@ func TestMarshaller_Marshal(t *testing.T) {
 	}{
 
 		{
+			description: "slice",
+			options: []Option{
+				WithTag(&Tag{Name: "Document"}), WithInverted(),
+			},
+			get: func() interface{} {
+				type Item struct {
+					Sequence    int    `xls:"Seq"`
+					Description string `xls:"-"`
+					Product     string
+				}
+				type Record struct {
+					ID     int
+					Name   string
+					Amount float64
+					List   []*Item
+					Info   string
+				}
+
+				return []*Record{
+					{
+						ID:     1,
+						Name:   "Name 1",
+						Amount: 3.2,
+						List: []*Item{
+							{
+								Sequence: 1,
+								Product:  "P1",
+							},
+							{
+								Sequence: 3,
+								Product:  "P2",
+							},
+						},
+						Info: "info 1",
+					},
+					{
+						ID:     2,
+						Name:   "Name 2",
+						Amount: 6.5,
+						List: []*Item{
+							{
+								Sequence: 1,
+								Product:  "P4",
+							},
+							{
+								Sequence: 2,
+								Product:  "P2",
+							},
+						},
+						Info: "info 2",
+					}}
+
+			},
+		},
+
+		{
 			description: "one to one",
 			options: []Option{
-				WithTag(&Tag{Name: "Documnt"}),
+				WithTag(&Tag{WorkSheet: "Document"}),
 			},
 			get: func() interface{} {
 
@@ -43,75 +99,11 @@ func TestMarshaller_Marshal(t *testing.T) {
 				return &Holder{Doc: &Doc{
 					ID:       intPtr(101),
 					Customer: "customer 1",
+					Comments: "commnets",
 				}}
 			},
 		},
-		{
-			description: "one to many with style ref",
-			options: []Option{
-				WithNamedStyles("header", "header-font-style:bold"),
-				WithTag(&Tag{Name: "Documnt"}),
-			},
-			get: func() interface{} {
 
-				type LineItem struct {
-					Pos      int     `xls:"styleref=header"`
-					Name     string  `xls:"styleref=header"`
-					Quantity int     `xls:"styleref=header"`
-					Price    float64 `xls:"styleref=header"`
-				}
-
-				type Doc struct {
-					ID       *int        `xls:"styleref=header"`
-					Customer string      `xls:"styleref=header"`
-					Date     *time.Time  `xls:"styleref=header,style={width:150px}"`
-					Items    []*LineItem `xls:"embed=true,styleref=header"`
-					Comments string      `xls:"styleref=header"`
-				}
-
-				return []*Doc{
-					{
-						ID:       intPtr(101),
-						Customer: "customer 1",
-						Items: []*LineItem{
-							{
-								Pos:      1,
-								Name:     "Item 1",
-								Quantity: 3,
-								Price:    10.3,
-							},
-							{
-								Pos:      2,
-								Name:     "Item 2",
-								Quantity: 4,
-								Price:    40.1,
-							},
-						},
-						Comments: "comments 1",
-					},
-					{
-						ID:       intPtr(101),
-						Customer: "customer 2",
-						Date:     &now,
-						Items: []*LineItem{
-							{
-								Pos:      10,
-								Name:     "Item 10",
-								Quantity: 24,
-								Price:    44.3,
-							},
-							{
-								Pos:      20,
-								Name:     "Item 20",
-								Quantity: 33,
-								Price:    14.3,
-							},
-						},
-						Comments: "comments 2",
-					},
-				}
-			},
-		},
 		{
 			description: "object marshaling",
 			get: func() interface{} {
@@ -138,26 +130,24 @@ func TestMarshaller_Marshal(t *testing.T) {
 				}
 
 				type Holder struct {
-					Info    []*Info   `xls:"dir=Vertical" `
+					Info    *Info     `xls:"invert=true" `
 					Records []*Record `xls:"name=Records"`
 				}
 
 				return &Holder{
-					Info: []*Info{
-						{
-							Report:     "Total",
-							ReportDate: &now,
-							From:       "2023-08-01",
-							To:         "2023-08-02",
-							Filters: []*Filter{
-								{
-									Name:    "Col1",
-									Include: []string{"1,2"},
-								},
-								{
-									Name:    "Col2",
-									Exclude: []string{"10,20"},
-								},
+					Info: &Info{
+						Report:     "Total",
+						ReportDate: &now,
+						From:       "2023-08-01",
+						To:         "2023-08-02",
+						Filters: []*Filter{
+							{
+								Name:    "Col1",
+								Include: []string{"1,2"},
+							},
+							{
+								Name:    "Col2",
+								Exclude: []string{"10,20"},
 							},
 						},
 					},
@@ -173,9 +163,8 @@ func TestMarshaller_Marshal(t *testing.T) {
 						},
 					},
 				}
-
 			},
-			options: []Option{WithTag(&Tag{Direction: DirectionVertical})},
+			options: []Option{WithInverted()},
 		},
 
 		{
@@ -184,7 +173,7 @@ func TestMarshaller_Marshal(t *testing.T) {
 				type Foo struct {
 					ID      int `xls:"name=Id"`
 					Name    string
-					Price   float64    `xls:"name=Price,style={width:200;color:red;header-font-style:bold;format:'###,##0.0000'}"`
+					Price   float64    `xls:"name=Price,style={width:200;color:red;font-style:bold;format:'###,##0.0000'}"`
 					Started *time.Time `xls:"name=Started,style={format:iso8601}"`
 				}
 				return []*Foo{
@@ -204,45 +193,19 @@ func TestMarshaller_Marshal(t *testing.T) {
 
 			options: []Option{},
 		},
-		{
-			description: " marshaling with default style",
-			get: func() interface{} {
-				type Foo struct {
-					Id      int `xls:"name=ID"`
-					Name    string
-					Price   float64    `xls:"name=Price,style={width:20;color:red;header-font-style:bold;format:'###,##0.0000'}"`
-					Started *time.Time `xls:"name=Started,style={width:100px;format:iso8601}"`
-				}
-				return []*Foo{
-					{
-						Id:      1,
-						Name:    "name 1",
-						Started: &now,
-					},
-					{
-						Id:    2,
-						Name:  "name 2",
-						Price: 1231232312.4444,
-					},
-				}
-
-			},
-
-			options: []Option{
-				WithDefaultStyle("header-font-style:bold"),
-			},
-		},
 	}
 	fs := afs.New()
 
-	for i, testCase := range testCases[:1] {
+	for i, testCase := range testCases {
+
 		aMarshaller := NewMarshaller(testCase.options...)
 		data, err := aMarshaller.Marshal(testCase.get())
 		if !assert.Nil(t, err, testCase.description) {
 			continue
 		}
 		assert.Truef(t, len(data) > 0, testCase.description)
-		err = fs.Upload(context.Background(), path.Join(os.Getenv("HOME"), fmt.Sprintf("test_%02d.xlsx", i)), file.DefaultFileOsMode, bytes.NewReader(data))
+		baseDir, _ := os.Getwd()
+		err = fs.Upload(context.Background(), path.Join(baseDir, "testdata", fmt.Sprintf("test_%02d.xlsx", i)), file.DefaultFileOsMode, bytes.NewReader(data))
 		assert.Nil(t, err, testCase.description)
 	}
 }

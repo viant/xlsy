@@ -33,27 +33,17 @@ You can use the following struct Tag to customize output
 
 The following style are currently supported
 - color
-- header-color
 - background-color
-- header-background-color
 - background-gradient
-- header-background-gradient
 - font-style
-- header-font-style
 - font-family
-- header-font-family
 - vertical-align
-- header-vertical-align
 - text-align
-- header-text-align
 - text-wrap
-- header-text-wrap
 - text-indent
-- header-text-indent
 - width
 - width-max
 - height
-- header-height
 - format
 
 ## Usage
@@ -102,7 +92,7 @@ func ExampleNewMarshaller() {
 		},
 	}
 
-	marshaller := xlsy.NewMarshaller(xlsy.WithDefaultStyle("header-font-style:bold"))
+	marshaller := xlsy.NewMarshaller(xlsy.WithDefaultStyle("font-style:bold"))
 	data, err := marshaller.Marshal(records)
 	if err != nil {
 		log.Fatal(err)

@@ -1,10 +1,10 @@
 package xlsy
 
 import (
+	"github.com/viant/xreflect"
 	"github.com/viant/xunsafe"
 	"reflect"
 	"sort"
-	"strconv"
 )
 
 const (
@@ -21,11 +21,37 @@ const (
 type (
 	//Table represents a table
 	Table struct {
+		indexPos indexPos
 		Parent   *Column
 		Stylizer *Stylizer
-		Tag      *Tag
-		Columns  Columns
-		Type     reflect.Type
+		*Tag
+		Columns     Columns
+		Header      *Row
+		Rows        Rows
+		Type        reflect.Type
+		IsStruct    bool
+		Cardinality int
+	}
+
+	indexPos []int
+	Rows     []*Row
+
+	Values []*value
+	Row    struct {
+		Values   Values
+		Snapshot Cursor
+		StyleID  int
+	}
+
+	value struct {
+		header    *Row
+		rows      Rows
+		hasValue  bool
+		value     interface{}
+		styleID   *int
+		width     float64
+		omitEmpty bool
+		snapshot  *Cursor
 	}
 	//ColumnAddress represents acolumn
 	Column struct {
@@ -42,27 +68,102 @@ type (
 	Columns []*Column
 )
 
-// Size represents a size
-func (c *Column) Size() int {
-	if c.size != 0 {
-		return c.size
+func (v *value) Columns() int {
+	if v.header != nil {
+		count := 0
+		for _, candidate := range v.header.Values {
+			if !candidate.omitEmpty {
+				count++
+			}
+			if candidate.hasValue {
+				count++
+			}
+		}
+		return count
 	}
-	if c.Table == nil {
-		c.size = 1
-		return c.size
+	return 1
+}
+
+func (v *value) Rows() int {
+	if rows := len(v.rows); rows > 0 {
+		return rows
 	}
-	c.size = c.Table.ColumnSize()
-	return c.size
+	return 1
+}
+
+func (v *value) setValue(val interface{}) {
+	v.value = val
+	v.hasValue = true
+}
+
+func (v *value) HasValue() bool {
+	if v.hasValue {
+		return true
+	}
+	if len(v.rows) == 0 {
+		return false
+	}
+	if len(v.rows) > 1 {
+		return true
+	}
+	for _, value := range v.rows[0].Values {
+		if value.HasValue() {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *Values) index(index int) *value {
+	if index < len(*v) {
+		return (*v)[index]
+	}
+	for i := len(*v); i < index+1; i++ {
+		*v = append(*v, &value{})
+	}
+	return (*v)[index]
+}
+
+func (v *Rows) index(index int) *Row {
+	if index < len(*v) {
+		return (*v)[index]
+	}
+	for i := len(*v); i < index+1; i++ {
+		*v = append(*v, &Row{})
+	}
+	return (*v)[index]
+}
+
+func (v *indexPos) expand(index int) {
+	if index < len(*v) {
+		return
+	}
+	for i := len(*v); i < index+1; i++ {
+		*v = append(*v, 0)
+	}
 }
 
 // HeaderStyleID returns header style ID or nil
 func (c *Column) HeaderStyleID(stylizer *Stylizer) *int {
-	if c.Tag.Style == "" {
+	if c.Tag.HeaderStyle == nil {
 		return nil
 	}
-	if c.Tag.Style != "" {
-		if style := stylizer.Style(c.Tag.Style); style != nil && style.Header.Style != nil {
+	if style := c.Tag.HeaderStyle.Style; style != "" {
+		if style := stylizer.Style(style); style != nil && style.Header.Style != nil {
 			return style.Header.ID
+		}
+	}
+	return nil
+}
+
+// ColumnStyleID returns column style ID or nil
+func (c *Column) ColumnStyleID(stylizer *Stylizer) *int {
+	if c.Tag.ColumnStyle == nil {
+		return nil
+	}
+	if style := c.Tag.ColumnStyle.Style; style != "" {
+		if style := stylizer.Style(style); style != nil && style.Column.Style != nil {
+			return style.Column.ID
 		}
 	}
 	return nil
@@ -70,18 +171,19 @@ func (c *Column) HeaderStyleID(stylizer *Stylizer) *int {
 
 // Width returns width
 func (c *Column) Width(stylizer *Stylizer) *Length {
-	if c.Tag.Style == "" {
+	style := c.Tag.ColumnStyle
+	if style == nil {
 		return nil
 	}
-	if c.Tag.Style != "" {
-		if style := stylizer.Style(c.Tag.Style); style != nil && style.Cell != nil {
-			width := style.Cell.Width
-			if style.Cell.WidthMax != nil {
-				if style.Cell.WidthMax.Value() < width.Value() {
-					return style.Cell.WidthMax
+	if style.Style != "" {
+		if style := stylizer.Style(style.Style); style != nil && style.Column != nil {
+			width := style.Column.Width
+			if style.Column.WidthMax != nil {
+				if style.Column.WidthMax.Value() < width.Value() {
+					return style.Column.WidthMax
 				}
 			}
-			return style.Cell.Width
+			return style.Column.Width
 		}
 	}
 	return nil
@@ -89,99 +191,81 @@ func (c *Column) Width(stylizer *Stylizer) *Length {
 
 // CellStyleID returns a style ID
 func (c *Column) CellStyleID(stylizer *Stylizer) *int {
-	if c.Tag.Style == "" {
+	if c.Tag.CellStyle == nil {
 		return nil
 	}
-	if c.Tag.Style != "" {
-		if style := stylizer.Style(c.Tag.Style); style != nil && style.Cell.Style != nil {
-			return style.Cell.ID
+	if style := c.Tag.CellStyle.Style; style != "" {
+		if style := stylizer.Style(style); style != nil && style.Cell.Style != nil {
+			return style.Header.ID
 		}
 	}
+
 	return nil
-}
-
-// Style returns column style
-func (c *Column) Style() *Style {
-	if c.Tag.Style == "" {
-		return nil
-	}
-	return &Style{Definition: c.Tag.Style}
-}
-
-// ColumnSize returns column size
-func (t *Table) ColumnSize() int {
-	ret := 0
-	for _, column := range t.Columns {
-		ret += column.Size()
-	}
-	return ret
-}
-
-// IsVertical returns true if table direction is vertical
-func (t *Table) IsVertical() bool {
-	if t.Tag.Direction == DirectionVertical {
-		return true
-	}
-	return false
 }
 
 // SheetName returns table cheed name
 func (t *Table) SheetName() string {
-	if t.Tag.Name != "" {
-		return t.Tag.Name
+	if t.Tag.WorkSheet != "" {
+		return t.Tag.WorkSheet
 	}
 	return defaultSheetName
 }
 
-// Address returns cell address
-func (t *Table) Address(row, column int) string {
-	address := t.address(row, column)
-	return address
+func (t *Table) IsStandalone() bool {
+	return t.Tag.WorkSheet != ""
 }
 
-// ColumnAddress returns column address
-func (t *Table) ColumnAddress(column int) string {
-	return string([]byte{'A' + byte(column)})
-}
-
-func (t *Table) address(row int, column int) string {
-	if t.IsVertical() {
-		y := strconv.Itoa(1 + column)
-		x := 'A' + byte(row)
-		return string(append([]byte{x}, y...))
-	}
-	y := strconv.Itoa(1 + row)
-	x := 'A' + byte(column)
-	return string(append([]byte{x}, y...))
-}
-
-// OffsetY returns table y offset
+// OffsetY returns table y dim
 func (t *Table) OffsetY() int {
-	if t.Tag.OffsetY != 0 {
-		return t.Tag.OffsetY
+	if t.Tag.RowOffset != 0 {
+		return t.Tag.RowOffset
 	}
 	return 0
 }
 
-// OffsetX returns table x offset
+// OffsetX returns table x dim
 func (t *Table) OffsetX() int {
-	if t.Tag.OffsetY != 0 {
-		return t.Tag.OffsetX
+	if t.Tag.RowOffset != 0 {
+		return t.Tag.ColumnOffset
 	}
 	return 0
+}
+
+func (t *Table) newHeader(index, position int) *value {
+	if t.Header == nil {
+		t.Header = &Row{}
+	}
+	value := t.Header.Values.index(index)
+	t.indexPos.expand(position)
+	t.indexPos[position] = index
+	return value
+}
+
+func (t *Table) UseRow(b bool) bool {
+	if t.Invert() {
+		return !b
+	}
+	return b
 }
 
 // NewTable creates a table
-func NewTable(sliceType reflect.Type, tableTag *Tag, stylizer *Stylizer, parent *Column) (*Table, error) {
-	structType := ensureStruct(sliceType)
+func NewTable(rType reflect.Type, tableTag *Tag, aSession *session, parent *Column) (*Table, error) {
+
+	isTime := xreflect.TimeType == rType || xreflect.TimePtrType == rType
+	isStruct := !isTime && ensureStruct(rType) != nil && rType.Kind() != reflect.Slice
+	structType := ensureStruct(rType)
 	xStruct := xunsafe.NewStruct(structType)
-	var ret = &Table{Tag: tableTag, Stylizer: stylizer, Type: sliceType, Parent: parent}
+	var ret = &Table{Tag: tableTag, Stylizer: aSession.stylizer, Type: rType, Parent: parent, IsStruct: isStruct}
 	ret.Columns = make(Columns, len(xStruct.Fields))
 	for i := range xStruct.Fields {
 		field := &xStruct.Fields[i]
 		fieldTag, err := parseTag(field.Tag.Get(TagName))
 		if err != nil {
 			return nil, err
+		}
+
+		if fieldTag.Inverted == nil {
+			fieldTag.Inverted = tableTag.Inverted
 		}
 		columnPos := int(field.Index)
 		if pos := fieldTag.Position; pos != nil {
@@ -199,26 +283,42 @@ func NewTable(sliceType reflect.Type, tableTag *Tag, stylizer *Stylizer, parent 
 			Position: columnPos,
 		}
 		ret.Columns[columnPos] = column
-		if ensureSlice(field.Type) != nil && ensureStruct(field.Type) != nil {
-			if err != nil {
+
+		isTime := xreflect.TimeType == field.Type || xreflect.TimePtrType == field.Type
+		isStruct := !isTime && ensureStruct(field.Type) != nil
+		column.setName(fieldTag, field)
+		if isStruct && (!fieldTag.Ignore && !fieldTag.Blank) {
+			if column.Table, err = NewTable(field.Type, fieldTag, aSession, column); err != nil {
 				return nil, err
-			}
-			if column.Table, err = NewTable(field.Type, fieldTag, stylizer, column); err != nil {
-				return nil, err
-			}
-			if column.Table.Tag.Name == "" || column.Table.Tag.Embed {
-				column.Table.Tag.Embed = true
-				column.Table.Tag.Name = ret.SheetName()
 			}
 			continue
 		}
 
-		if column.Tag.Style, err = stylizer.styleDefinition(column.Tag.Style, column.Tag.StyleRef); err != nil {
-			return nil, err
+		if style := column.Tag.CellStyle; style != nil {
+			if style.Style, err = aSession.stylizer.styleDefinition(style.Destination, style.Style, style.Ref); err != nil {
+				return nil, err
+			}
 		}
-		column.setName(fieldTag, field, tableTag, parent)
-		if style := column.Style(); style != nil {
-			if err = stylizer.Register(style); err != nil {
+		if column.Tag.HeaderStyle == nil {
+			column.Tag.HeaderStyle = &StyleTag{Destination: "header"}
+		}
+		if style := column.Tag.HeaderStyle; style != nil {
+			if style.Style, err = aSession.stylizer.styleDefinition(style.Destination, style.Style, style.Ref); err != nil {
+				return nil, err
+			}
+		}
+		if style := column.Tag.CellStyle; style != nil {
+			if err = aSession.stylizer.Register(style.Definition()); err != nil {
+				return nil, err
+			}
+		}
+		if style := column.Tag.HeaderStyle; style != nil {
+			if err = aSession.stylizer.Register(style.Definition()); err != nil {
+				return nil, err
+			}
+		}
+		if style := column.Tag.ColumnStyle; style != nil {
+			if err = aSession.stylizer.Register(style.Definition()); err != nil {
 				return nil, err
 			}
 		}
@@ -229,13 +329,13 @@ func NewTable(sliceType reflect.Type, tableTag *Tag, stylizer *Stylizer, parent 
 	return ret, nil
 }
 
-func (c *Column) setName(columnTag *Tag, field *xunsafe.Field, tableTag *Tag, parent *Column) {
+func (c *Column) setName(columnTag *Tag, field *xunsafe.Field) {
+	if columnTag.Embed {
+		return
+	}
 	name := columnTag.Name
 	if name == "" {
 		name = field.Name
-		if tableTag.Embed {
-			name = parent.Field.Name + "." + name
-		}
 	}
 	c.Name = name
 }

@@ -7,6 +7,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/viant/afs v1.24.2
 	github.com/viant/parsly v0.2.0
+	github.com/viant/xdatly v0.0.0-00010101000000-000000000000
 	github.com/viant/xunsafe v0.9.0
 	github.com/xuri/excelize/v2 v2.7.1
 )
@@ -24,10 +25,10 @@ require (
 	github.com/xuri/efp v0.0.0-20220603152613-6918739fd470 // indirect
 	github.com/xuri/nfp v0.0.0-20220409054826-5e722a1d9e22 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
-	golang.org/x/tools v0.12.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/viant/xdatly => /Users/awitas/go/src/github.com/viant/xdatly

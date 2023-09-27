@@ -40,7 +40,7 @@ func ExampleNewMarshaller() {
 		},
 	}
 
-	marshaller := xlsy.NewMarshaller(xlsy.WithDefaultStyle("header-font-style:bold"))
+	marshaller := xlsy.NewMarshaller(xlsy.WithDefaultStyle("font-style:bold"))
 	data, err := marshaller.Marshal(records)
 	if err != nil {
 		log.Fatal(err)

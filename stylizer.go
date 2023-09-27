@@ -8,14 +8,19 @@ import (
 
 // Stylizer represents stylizer
 type Stylizer struct {
-	defaultStyle string
-	namedStyles  map[string]string
-	file         *excelize.File
-	registry     map[string]*Style
+	defaultCellStyle   string
+	defaultHeaderStyle string
+	namedStyles        map[string]string
+	file               *excelize.File
+	registry           map[string]*Style
 }
 
-func (s *Stylizer) styleDefinition(def string, refs string) (string, error) {
-	if s.defaultStyle == "" && def == "" && refs == "" {
+func (s *Stylizer) styleDefinition(destination string, def string, refs string) (string, error) {
+	defaultStyle := s.defaultCellStyle
+	if destination == "header" {
+		defaultStyle = s.defaultHeaderStyle
+	}
+	if defaultStyle == "" && def == "" && refs == "" {
 		return "", nil
 	}
 
@@ -32,13 +37,13 @@ func (s *Stylizer) styleDefinition(def string, refs string) (string, error) {
 		}
 	}
 
-	if s.defaultStyle == "" {
+	if defaultStyle == "" {
 		return def, nil
 	}
 	if def == "" {
-		return s.defaultStyle, nil
+		return defaultStyle, nil
 	}
-	return s.defaultStyle + ";" + def, nil
+	return defaultStyle + ";" + def, nil
 }
 
 // Style returns register style or nil

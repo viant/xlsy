@@ -19,7 +19,7 @@ func TestParseTag(t *testing.T) {
 		},
 		{
 			tag:    `style={width:10;height:30}`,
-			expect: &Tag{Style: "width:10;height:30"},
+			expect: &Tag{CellStyle: &StyleTag{Style: "width:10;height:30"}},
 		},
 	}
 
