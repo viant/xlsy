@@ -1,7 +1,6 @@
 package xlsy
 
 import (
-	"fmt"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -25,7 +24,6 @@ func (s *workSheet) SetActiveSheet() {
 }
 
 func (s *workSheet) SetCellValue(cell string, value interface{}) error {
-	fmt.Printf("%v %v %v\n", s.name, cell, value)
 	return s.dest.SetCellValue(s.name, cell, value)
 }
 
@@ -34,7 +32,6 @@ func (s *workSheet) SetCellStyle(hCell, vCell string, styleID int) error {
 }
 
 func (s *workSheet) MergeCells(hCell, vCell string) error {
-	fmt.Printf("MERGE: %v %v\n", hCell, vCell)
 	return s.dest.MergeCell(s.name, hCell, vCell)
 }
 
