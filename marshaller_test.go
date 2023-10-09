@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/viant/afs"
 	"github.com/viant/afs/file"
+	"github.com/viant/structology/format"
 	"os"
 	"path"
 	"testing"
@@ -25,7 +26,7 @@ func TestMarshaller_Marshal(t *testing.T) {
 		{
 			description: "slice",
 			options: []Option{
-				WithTag(&Tag{Name: "Document"}), WithInverted(),
+				WithTag(&Tag{Tag: &format.Tag{Name: "Document"}}), WithInverted(),
 			},
 			get: func() interface{} {
 				type Item struct {

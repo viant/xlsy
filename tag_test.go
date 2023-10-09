@@ -2,6 +2,8 @@ package xlsy
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/viant/structology/format"
+	"reflect"
 	"testing"
 )
 
@@ -9,17 +11,17 @@ func TestParseTag(t *testing.T) {
 
 	var testCases = []struct {
 		description string
-		tag         string
+		tag         reflect.StructTag
 		expect      *Tag
 	}{
 
 		{
-			tag:    `name=ColumnX`,
-			expect: &Tag{Name: "ColumnX"},
+			tag:    `xls:"name=ColumnX""`,
+			expect: &Tag{Tag: &format.Tag{Name: "ColumnX"}},
 		},
 		{
-			tag:    `style={width:10;height:30}`,
-			expect: &Tag{CellStyle: &StyleTag{Style: "width:10;height:30"}},
+			tag:    `xls:"style={width:10;height:30}"`,
+			expect: &Tag{CellStyle: &StyleTag{Style: "width:10;height:30"}, Tag: &format.Tag{Name: ""}},
 		},
 	}
 

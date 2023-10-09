@@ -183,7 +183,7 @@ func (s *workSheet) transferHeader(table *Table, cur Cursor) (dim Cursor, err er
 		if colTable := column.Table; colTable != nil {
 			cellAddr := cur.clone()
 
-			if !table.Embed {
+			if !table.Inline {
 				cellAddr.inc(1, table.UseRow(true))
 			}
 			cellDim, err := s.transferHeader(colTable, cellAddr)
@@ -192,7 +192,7 @@ func (s *workSheet) transferHeader(table *Table, cur Cursor) (dim Cursor, err er
 			}
 
 			expanded := cur.clone()
-			if h := cellDim.value(colTable.UseRow(true)); h >= height && !table.Embed {
+			if h := cellDim.value(colTable.UseRow(true)); h >= height && !table.Inline {
 				height = h + 1
 			}
 			if s := cellDim.value(colTable.UseRow(false)); s > span {
@@ -200,7 +200,7 @@ func (s *workSheet) transferHeader(table *Table, cur Cursor) (dim Cursor, err er
 				expanded.inc(s-1, colTable.UseRow(false))
 			}
 
-			if table.Inverted == column.Table.Inverted && !table.Embed {
+			if table.Inverted == column.Table.Inverted && !table.Inline {
 				if err := s.MergeCells(cur.String(), expanded.String()); err != nil {
 					return 0, err
 				}
@@ -211,7 +211,7 @@ func (s *workSheet) transferHeader(table *Table, cur Cursor) (dim Cursor, err er
 		cur.inc(span, table.UseRow(false))
 	}
 
-	if !table.Embed {
+	if !table.Inline {
 		if err = s.mergeHeaders(table, height); err != nil {
 			return 0, err
 		}

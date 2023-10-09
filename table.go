@@ -259,7 +259,7 @@ func NewTable(rType reflect.Type, tableTag *Tag, aSession *session, parent *Colu
 	ret.Columns = make(Columns, len(xStruct.Fields))
 	for i := range xStruct.Fields {
 		field := &xStruct.Fields[i]
-		fieldTag, err := parseTag(field.Tag.Get(TagName))
+		fieldTag, err := parseTag(field.Tag)
 		if err != nil {
 			return nil, err
 		}
@@ -330,10 +330,10 @@ func NewTable(rType reflect.Type, tableTag *Tag, aSession *session, parent *Colu
 }
 
 func (c *Column) setName(columnTag *Tag, field *xunsafe.Field) {
-	if columnTag.Embed {
+	if columnTag.Inline {
 		return
 	}
-	name := columnTag.Name
+	name := columnTag.FormatName()
 	if name == "" {
 		name = field.Name
 	}

@@ -3,6 +3,8 @@ package xlsy
 import (
 	"fmt"
 	"github.com/viant/parsly"
+	"github.com/viant/structology/format"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -17,15 +19,12 @@ type (
 	}
 
 	Tag struct {
-		Name         string
+		*format.Tag
 		WorkSheet    string
 		HeaderStyle  *StyleTag
 		CellStyle    *StyleTag
 		ColumnStyle  *StyleTag
-		Embed        bool
-		Ignore       bool
 		Blank        bool
-		Omitempty    bool
 		Position     *int
 		Inverted     *bool //inverted orientation
 		First        bool
@@ -118,15 +117,10 @@ func setStyle(candidate, t *StyleTag) {
 func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 	attr := strings.ToLower(key)
 	switch attr {
-	case "name":
-		t.Name = value
 	case "worksheet":
 		t.WorkSheet = value
 	case "omitempty":
 		t.Omitempty = true
-	case "embed":
-		embed := value == "true"
-		t.Embed = embed
 	case "invert", "inverted":
 		invert := value == "true"
 		t.Inverted = &invert
@@ -168,7 +162,9 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 			}
 			*styles = append(*styles, style)
 		} else {
-			return fmt.Errorf("unsupported xls tag key: %s", key)
+			if !format.IsValidTagKey(attr) {
+				return fmt.Errorf("unsupported xls tag key: %s", key)
+			}
 		}
 	case "":
 		return nil
@@ -176,8 +172,18 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 	return nil
 }
 
-func parseTag(tag string) (*Tag, error) {
-	ret := &Tag{}
+func parseTag(structTag reflect.StructTag) (*Tag, error) {
+
+	formatTag, err := format.Parse(structTag, TagName)
+	if err != nil {
+		return nil, err
+	}
+	if formatTag == nil {
+		formatTag = &format.Tag{}
+	}
+	ret := NewTag()
+	ret.Tag = formatTag
+	tag := structTag.Get(TagName)
 	if tag == "" {
 		return ret, nil
 	}
@@ -188,8 +194,6 @@ func parseTag(tag string) (*Tag, error) {
 	case ",blank":
 		ret.Blank = true
 		return ret, nil
-	case ",embed":
-		ret.Embed = true
 	case ",omitempty":
 		ret.Omitempty = true
 	}
@@ -244,4 +248,8 @@ func convertAndSetInt(dest *int, field, value string) error {
 	}
 	*dest = intValue
 	return nil
+}
+
+func NewTag() *Tag {
+	return &Tag{Tag: &format.Tag{}}
 }

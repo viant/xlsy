@@ -19,7 +19,7 @@ func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 	dest := excelize.NewFile()
 	rawType := reflect.TypeOf(any)
 	stylizer := &Stylizer{registry: map[string]*Style{}, file: dest}
-	aSession := newSession(nil, stylizer, &Tag{})
+	aSession := newSession(nil, stylizer, NewTag())
 	err := aSession.apply(m.session)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,8 @@ func (m *Marshaller) buildSheets(v any, structType reflect.Type, parent *session
 		if fieldType.Kind() == reflect.Ptr {
 			fieldType = fieldType.Elem()
 		}
-		tag, err := parseTag(field.Tag.Get(TagName))
+
+		tag, err := parseTag(field.Tag)
 		if err != nil {
 			return nil, err
 		}

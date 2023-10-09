@@ -23,7 +23,7 @@ func (m *session) apply(options []Option) error {
 		}
 	}
 	if m.tag == nil {
-		m.tag = &Tag{}
+		m.tag = NewTag()
 	}
 	return nil
 }
