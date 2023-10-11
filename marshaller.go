@@ -39,10 +39,14 @@ func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for _, name := range aSession.names {
 		item := aSession.sheets[name]
 		if err := item.transfer(); err != nil {
 			return nil, err
+		}
+		if sheet == nil || sheet.index == nil {
+			sheet = aSession.sheets[name]
 		}
 	}
 	if sheet != nil {
@@ -60,6 +64,7 @@ func (m *Marshaller) Marshal(any interface{}) ([]byte, error) {
 
 func (m *Marshaller) deleteDefaultWorksheetIfNeeded(aSheet *workSheet) {
 	if aSheet.index == nil {
+		_ = aSheet.dest.DeleteSheet(defaultSheetName)
 		return
 	}
 	workSheet := aSheet.dest.WorkBook.Sheets.Sheet[*aSheet.index]
