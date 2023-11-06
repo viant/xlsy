@@ -7,7 +7,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/viant/afs v1.25.0
 	github.com/viant/parsly v0.3.0
-	github.com/viant/structology v0.5.0
+	github.com/viant/tagly v0.1.0
 	github.com/viant/xreflect v0.3.1
 	github.com/viant/xunsafe v0.9.0
 	github.com/xuri/excelize/v2 v2.8.0

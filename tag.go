@@ -3,7 +3,7 @@ package xlsy
 import (
 	"fmt"
 	"github.com/viant/parsly"
-	"github.com/viant/structology/format"
+	"github.com/viant/tagly/format"
 	"reflect"
 	"strconv"
 	"strings"

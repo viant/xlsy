@@ -2,7 +2,7 @@ package xlsy
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/viant/structology/format"
+	"github.com/viant/tagly/format"
 	"reflect"
 	"testing"
 )

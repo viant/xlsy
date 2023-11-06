@@ -40,8 +40,8 @@ github.com/viant/assertly v0.9.1-0.20220620174148-bab013f93a60 h1:VFJvCOHKXv4IqX
 github.com/viant/assertly v0.9.1-0.20220620174148-bab013f93a60/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49uaYMPRU=
 github.com/viant/parsly v0.3.0 h1:UR4/ml87j4StdEa+CeSicKlW+pXMMFx0J+U95YcfE0o=
 github.com/viant/parsly v0.3.0/go.mod h1:4PKQzioRT9R99ceIhZ6tCD3tp0H0n2dEoIOaLulVvrg=
-github.com/viant/structology v0.5.0 h1:BTmGK078To0Q040d0/ESjn5UOFebgDELMVe+Qt9kGAI=
-github.com/viant/structology v0.5.0/go.mod h1:FuV201UpB3efpVlm5YVERK6vEDT7L8u+xbrei/MeHe8=
+github.com/viant/tagly v0.1.0 h1:ely64jH/kCMsZXJTLy4K7ACo9et6vPed86joYc1LswY=
+github.com/viant/tagly v0.1.0/go.mod h1:vV8QgJkhug+X+qyKds8av0fhjD+4u7IhNtowL1KGQ5A=
 github.com/viant/toolbox v0.34.6-0.20221112031702-3e7cdde7f888 h1:iQ9ehV+Qev9s/L4eXFFaw3zvZVid+xTT5fW3G3ldEdk=
 github.com/viant/toolbox v0.34.6-0.20221112031702-3e7cdde7f888/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
 github.com/viant/xreflect v0.3.1 h1:Avqq1wXJFlXyCmS9C8TyxRNWUIxApk0S0WGdAFt4Hv4=

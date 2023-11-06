@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/viant/afs"
 	"github.com/viant/afs/file"
-	"github.com/viant/structology/format"
+	"github.com/viant/tagly/format"
 	"os"
 	"path"
 	"testing"
