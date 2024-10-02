@@ -24,6 +24,7 @@ type (
 		HeaderStyle  *StyleTag
 		CellStyle    *StyleTag
 		ColumnStyle  *StyleTag
+		SheetPos     int
 		Blank        bool
 		Position     *int
 		Inverted     *bool //inverted orientation
@@ -142,6 +143,13 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 		if err := convertAndSetInt(&t.RowOffset, "rowOffset", value); err != nil {
 			return err
 		}
+	case "sheetpos":
+		var pos int
+		if err := convertAndSetInt(&pos, "sheetPos", value); err != nil {
+			return err
+		}
+		t.SheetPos = pos
+
 	case "pos":
 		var pos int
 		if err := convertAndSetInt(&pos, "pos", value); err != nil {
@@ -149,6 +157,7 @@ func (t *Tag) update(key, value string, styles *[]*StyleTag) error {
 		}
 		t.Position = &pos
 	default:
+
 		if strings.HasSuffix(attr, "style") {
 			var style = &StyleTag{Style: value}
 			if index := strings.Index(attr, "."); index != -1 {

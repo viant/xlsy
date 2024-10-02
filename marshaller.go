@@ -6,6 +6,7 @@ import (
 	"github.com/viant/xunsafe"
 	"github.com/xuri/excelize/v2"
 	"reflect"
+	"sort"
 	"unsafe"
 )
 
@@ -77,7 +78,17 @@ func (m *Marshaller) buildSheets(v any, structType reflect.Type, parent *session
 	xStruct := xunsafe.NewStruct(structType)
 	ptr := xunsafe.AsPointer(v)
 	var aSheet *workSheet
-	for i := range xStruct.Fields {
+
+	var fields = xStruct.Fields
+	sort.Slice(fields, func(i, j int) bool {
+		posI := sheetPos(&xStruct.Fields[i])
+		posJ := sheetPos(&xStruct.Fields[j])
+		if posI == posJ {
+			return xStruct.Fields[i].Index < xStruct.Fields[j].Index
+		}
+		return posI < posJ
+	})
+	for i := range fields {
 		field := &xStruct.Fields[i]
 		fieldType := field.Type
 		if fieldType.Kind() == reflect.Ptr {
@@ -114,6 +125,13 @@ func (m *Marshaller) buildSheets(v any, structType reflect.Type, parent *session
 		return aSheet, nil
 	}
 	return aSheet, nil
+}
+
+func sheetPos(field *xunsafe.Field) int {
+	if tag, _ := parseTag(field.Tag); tag != nil {
+		return tag.SheetPos
+	}
+	return int(field.Index)
 }
 
 func (m *Marshaller) buildSheet(v any, tableType reflect.Type, aSession *session) (*workSheet, error) {
